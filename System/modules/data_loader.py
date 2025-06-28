@@ -1,32 +1,18 @@
 import pandas as pd
 import streamlit as st
-from pathlib import Path
-import pandas as pd
 
 # 加载数据函数，设置缓存时间为 10 秒
 @st.cache_data(ttl=3600)
 
 def load_supplier_data():
     # Google Sheet 文件的 ID（你提供的链接）
-    #file_id = "1qH_odKEPlDrLTM8B8UfsMzW6Uu9ciDUW"
+    file_id = "1qH_odKEPlDrLTM8B8UfsMzW6Uu9ciDUW"
 
     # Google Sheet 的 CSV 导出地址
-    #csv_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv"
-
-    # 获取当前脚本的绝对路径
-    current_dir = Path(__file__).resolve().parent.parent
-
-    # 拼接 Excel 文件路径
-    excel_file_path = current_dir / "Xinya_供应商.xlsx"
-
-
-    # 读取 Excel 文件
-    df = pd.read_excel(excel_file_path)
-
-
+    csv_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv"
 
     # 读取 CSV 数据（从 Google Sheets）
-    #df = pd.read_csv(csv_url)
+    df = pd.read_csv(csv_url)
     df = df.dropna(how='all')
 
     # 自动转换常用日期字段为 datetime 类型（可按需扩展）
@@ -46,20 +32,16 @@ def load_supplier_data():
 
 def load_cash_data():
     # Google Sheet 文件的 ID（你提供的链接）
-    #file_id = "1qH_odKEPlDrLTM8B8UfsMzW6Uu9ciDUW"
+    file_id = "1U6Xx5mhzCkjd6l4UQ7rOjFq4WQkNpQEK"
 
     # Google Sheet 的 CSV 导出地址
-    #csv_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv"
+    csv_url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv"
 
-    # 获取当前脚本的绝对路径
-    current_dir = Path(__file__).resolve().parent.parent
-
-    # 拼接 Excel 文件路径
-    excel_file_path = current_dir / "Cash_refund.xlsx"
+    # 读取 CSV 数据（从 Google Sheets）
+    df_data = pd.read_csv(csv_url)
 
 
     # ✅ 步骤 1：读取 Excel 文件
-    df_data = pd.read_excel(excel_file_path,sheet_name= "数据")
     df_data = df_data.dropna(how='all')  # 删除完全为空的行
 
     # ✅ 步骤 2：统一日期和金额格式
