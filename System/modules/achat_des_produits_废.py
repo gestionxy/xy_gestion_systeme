@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 import numpy as np
 import plotly.express as px
 from modules.data_loader import load_supplier_data
-from modules.data_loader import get_ordered_departments
-import plotly.express as px
 
 # 采购数据分析 
 def achat_des_produits():
@@ -29,7 +27,7 @@ def achat_des_produits():
     # 视图选择按钮
     chart_type = st.radio(
         "请选择采购视图：", 
-        ['📆 部门月度采购', '📅 部门周度采购', '🏢 公司周度采购', '📊 公司采购时间间隔与金额分布'], 
+        ['📆 部门月度采购', '📅 部门周度采购', '🏢 公司周度采购'], 
         index=0, 
         horizontal=True
     )
@@ -121,10 +119,9 @@ def achat_des_produits():
         default_index = valid_months.index("2025-06") if "2025-06" in valid_months else len(valid_months)-1
         selected_month = st.selectbox("📅 选择月份", valid_months, index=default_index)
 
-        # ✅ 定义你希望优先显示的部门顺序
-        # 定义的部门顺序函数 位于 data_loader.py， 函数名：get_ordered_departments，可前往查看详细版本
-        departments, default_dept_index = get_ordered_departments(df)
-        selected_dept = st.selectbox("🏷️ 选择部门", departments, index=default_dept_index, key="dept_select")
+        dept_list = sorted(df['部门'].unique())
+        default_dept_index = dept_list.index("杂货") if "杂货" in dept_list else 0
+        selected_dept = st.selectbox("🏷️ 选择部门", dept_list, index=default_dept_index)
 
         df_filtered = df[(df['月份'] == selected_month) & (df['部门'] == selected_dept)].copy()
         df_filtered['周开始'] = df_filtered['发票日期'] - pd.to_timedelta(df_filtered['发票日期'].dt.weekday, unit='D')
@@ -161,126 +158,3 @@ def achat_des_produits():
             hovertemplate="%{customdata[0]}"
         )
         st.plotly_chart(fig_company_week, key="company_week_chart")
-
-    
-    
-    elif chart_type == '📊 公司采购时间间隔与金额分布':
-
-
-        df['发票日期'] = pd.to_datetime(df['发票日期'], errors='coerce')
-        df = df.dropna(subset=['发票金额', '发票日期'])
-        df['月份'] = df['发票日期'].dt.to_period('M').astype(str)
-        
-        
-        df['周开始'] = df['发票日期'] - pd.to_timedelta(df['发票日期'].dt.weekday, unit='D')
-        df['周结束'] = df['周开始'] + timedelta(days=6)
-        df['周范围'] = df['周开始'].dt.strftime('%Y-%m-%d') + ' ~ ' + df['周结束'].dt.strftime('%Y-%m-%d')
-
-
-        # 2. 交互组件
-
-        # ✅ 定义你希望优先显示的部门顺序
-        # 定义的部门顺序函数 位于 data_loader.py， 函数名：get_ordered_departments，可前往查看详细版本
-        departments, default_dept_index = get_ordered_departments(df)
-        selected_dept = st.selectbox("🏷️ 选择部门", departments, index=default_dept_index, key="dept_select")
-
-
-        company_list = sorted(df[df['部门'] == selected_dept]['公司名称'].unique())
-        company_list = ['全部'] + company_list  # 添加“全部”选项至顶部
-
-        company_mode = st.selectbox("公司选择模式", ["全部公司", "手动选择公司"])
-
-        if company_mode == "全部公司":
-            selected_companies = company_list[1:]  # 自动全选全部公司（排除“全部”）
-        else:
-            selected_companies = st.multiselect("🏢 手动选择公司", company_list[1:], default=company_list[1:])
-
-
-        date_range = st.date_input("📆 选择日期范围", [df['发票日期'].min(), df['发票日期'].max()])
-
-
-        # 3. 数据筛选
-        filtered_df = df[(df['部门'] == selected_dept) &
-                        (df['公司名称'].isin(selected_companies)) &
-                        (df['发票日期'] >= pd.to_datetime(date_range[0])) &
-                        (df['发票日期'] <= pd.to_datetime(date_range[1]))]
-
-        if filtered_df.empty:
-            st.warning("❗ 当前筛选条件下没有数据。请调整部门、公司或时间范围。")
-            st.stop()
-
-        # 分组聚合后用于绘图的数据
-        scatter_df = (
-            filtered_df.groupby(['公司名称', '周范围', '周开始'])['发票金额']
-            .sum()
-            .reset_index()
-        )
-
-        scatter_df['发票金额'] = scatter_df['发票金额'].round(2)
-
-        #st.dataframe(scatter_df)
-
-        # 为了避免在气泡图（scatter bubble chart）中出现无效或报错的点，因为 size= 参数要求必须是正数。
-        scatter_df = scatter_df[scatter_df['发票金额'] > 0]
-
-        # 自动判断显示的公司数量逻辑
-        company_counts = scatter_df['公司名称'].nunique()
-
-        if company_counts <= 20:
-            companies_to_show = scatter_df['公司名称'].unique()
-        else:
-            # 仅保留采购金额前20的公司
-            companies_to_show = (
-                scatter_df.groupby('公司名称')['发票金额'].sum()
-                .sort_values(ascending=False)
-                .head(20)
-                .index.tolist()
-            )
-
-        # 过滤数据，仅保留要显示的公司
-        scatter_df = scatter_df[scatter_df['公司名称'].isin(companies_to_show)]
-
-        # ✅ 手动计算公司总采购金额排序
-        company_order = (
-            scatter_df.groupby("公司名称")["发票金额"]
-            .sum()
-            .sort_values(ascending=True)
-            .index.tolist()
-        )
-
-        # ✅ 设置公司名称为有序分类变量，顺序由总金额决定（从大到小）
-        scatter_df["公司名称"] = pd.Categorical(
-            scatter_df["公司名称"],
-            categories=company_order,
-            ordered=True
-        )
-
-        # ✅ 排序周开始字段，确保 X 轴按时间排列
-        scatter_df = scatter_df.sort_values(by='周开始')
-
-        # 绘制气泡图
-        fig = px.scatter(
-            scatter_df,
-            x="周开始",
-            y="公司名称",
-            size="发票金额",
-            color="公司名称",
-            hover_data={"发票金额": True, "周范围": True, "周开始": False},
-            title="公司采购时间间隔与金额分布"
-        )
-
-        # ✅ 去掉 Plotly 的自动排序，否则会干扰我们手动设定的顺序
-        fig.update_layout(
-            yaxis=dict(categoryorder="array", categoryarray=company_order),
-            height=max(500, len(companies_to_show) * 30)
-        )
-
-
-
-        st.info("⚠️ y 轴表示公司名称，按采购总金额从大到小排序。若公司数超过 20，仅显示前 20 家。")
-
-
-        st.plotly_chart(fig, use_container_width=True)
-        #st.dataframe(scatter_df[['公司名称', '发票金额']].groupby('公司名称').sum().sort_values('发票金额', ascending=False))
-
-

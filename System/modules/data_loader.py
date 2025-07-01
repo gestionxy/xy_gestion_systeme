@@ -77,3 +77,38 @@ def load_cash_data():
             df_data[col] = df_data[col].astype(str)
 
     return df_data
+
+def get_ordered_departments(df, column_name="部门", priority_order=None, default_name="杂货"):
+    """
+    根据给定的优先顺序对部门进行排序。
+    
+    参数：
+    - df: 包含部门列的 DataFrame
+    - column_name: 部门列的列名（默认为 "部门"）
+    - priority_order: 优先排序的部门列表（None 时使用默认顺序）
+    - default_name: 默认选中的部门名称（默认为 "杂货"）
+
+    返回：
+    - departments: 排序后的部门列表
+    - default_index: 默认部门在列表中的索引位置
+    """
+
+    if priority_order is None:
+        priority_order = ["杂货", "菜部", "冻部", "肉部", "鱼部", "厨房", "牛奶生鲜", "酒水", "面包"]
+
+    # 1. 获取所有不为空的唯一部门
+    all_departments = sorted(df[column_name].dropna().unique())
+
+    # 2. 先保留出现在数据库中的优先部门
+    ordered_preferred = [dept for dept in priority_order if dept in all_departments]
+
+    # 3. 其他剩余部门按字母排序
+    remaining_departments = sorted([dept for dept in all_departments if dept not in ordered_preferred])
+
+    # 4. 拼接最终排序列表
+    departments = ordered_preferred + remaining_departments
+
+    # 5. 确定默认部门索引
+    default_index = departments.index(default_name) if default_name in departments else 0
+
+    return departments, default_index

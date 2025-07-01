@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import plotly.express as px
 from modules.data_loader import load_supplier_data
+from modules.data_loader import get_ordered_departments
 
 
 # ** df_gestion_unpaid ** 是目前处理的最完整的表格，所有的后续处理均使用这张表格
@@ -108,8 +109,38 @@ def analyse_des_impayes():
     # 📋 选择部门查看公司明细
     # ------------------------------
     elif view_option == "查看部门下公司明细":
-        selected_dept = st.selectbox("请选择一个部门查看其公司明细：", by_department['部门'].unique())
+        #selected_dept = st.selectbox("请选择一个部门查看其公司明细：", by_department['部门'].unique())
+        #filtered = by_department_company[by_department_company['部门'] == selected_dept]
+
+        # ✅ 定义你希望优先显示的部门顺序
+        # 定义的部门顺序函数 位于 data_loader.py， 函数名：get_ordered_departments，可前往查看详细版本
+        #departments, default_dept_index = get_ordered_departments(by_department_company)
+        #selected_dept = st.selectbox("🏷️ 选择部门", departments, index=default_dept_index, key="dept_select")
+
+        # ✅ 使用统一排序函数获取部门列表和默认选项
+        departments, default_dept_index = get_ordered_departments(by_department_company)
+        selected_dept = st.selectbox("🏷️ 选择部门查看公司明细", departments, index=default_dept_index, key="dept_detail_select")
+
+        # ✅ 按部门筛选数据
         filtered = by_department_company[by_department_company['部门'] == selected_dept]
+
+
+        # ✅ 判断公司数量，若超过20，仅显示应付未付金额前20的公司
+        company_count = filtered['公司名称'].nunique()
+        if company_count > 20:
+            top_companies = (
+                filtered.groupby('公司名称')['应付未付']
+                .sum()
+                .sort_values(ascending=False)
+                .head(20)
+                .index.tolist()
+            )
+            filtered = filtered[filtered['公司名称'].isin(top_companies)]
+
+
+        st.info("⚠️ 若部门下属的公司超过20家，则仅显示应付未付金额前20的公司。")
+
+
 
         fig = px.bar(
             filtered,
