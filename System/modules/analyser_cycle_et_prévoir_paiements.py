@@ -10,6 +10,12 @@ def analyser_cycle_et_prévoir_paiements():
 
     df = load_supplier_data()
 
+    # 过滤掉 “发票金额”和“实际支付金额”两列的 都为0的数据行
+    # 发票金额 = 实际支付金额 = 0， 表示void 取消的的支票，不再纳入我们的统计中
+    # 因为会影响后续 付款账期计算 以及 统计该公司的 发票数量
+    df = df[~((df['发票金额'] == 0) & (df['实际支付金额'] == 0))]
+
+
     df['发票日期'] = pd.to_datetime(df['发票日期'], errors='coerce')
     df['开支票日期'] = pd.to_datetime(df['开支票日期'], errors='coerce')
 
