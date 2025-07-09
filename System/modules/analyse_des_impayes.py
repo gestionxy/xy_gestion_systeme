@@ -125,6 +125,7 @@ def analyse_des_impayes():
         filtered = by_department_company[by_department_company['部门'] == selected_dept]
 
 
+
         # ✅ 判断公司数量，若超过20，仅显示应付未付金额前20的公司
         company_count = filtered['公司名称'].nunique()
         if company_count > 20:
