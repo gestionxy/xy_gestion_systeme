@@ -311,8 +311,12 @@ def analyse_des_payments():
         week_total_dict = company_week_summary.groupby('周范围')['实际支付金额'].sum().to_dict()
 
         # 提示信息（用于 hover）
+        # ❌ 原始写法为什么出错？ 你用了 week_total_dict[row['周范围']]，当某个“周范围”不在字典中时，会抛出 KeyError，
+        # 导致 .apply() 执行失败，返回了异常结构，不能赋值给一列 → 报错。
+        # .get() 会在找不到键时返回一个默认值（比如 0），不会报错，这样 .apply() 就能顺利对每一行返回一个字符串，最终结果是 一列字符串数据，可以正常赋值。
         company_week_summary['提示信息'] = company_week_summary.apply(
-            lambda row: f"所选周总支付金额：{week_total_dict[row['周范围']]:,.0f}<br>"
+            lambda row: #f"所选周总支付金额：{week_total_dict[row['周范围']]:,.0f}<br>"
+                        f"所选周总支付金额：{week_total_dict.get(row['周范围'], 0):,.0f}<br>"
                         f"公司名称：{row['公司名称']}<br>"
                         f"实际付款金额：{row['实际支付金额']:,.0f}<br>"
                         f"占比：{row['实际支付金额'] / week_total_dict.get(row['周范围'], 1):.1%}",

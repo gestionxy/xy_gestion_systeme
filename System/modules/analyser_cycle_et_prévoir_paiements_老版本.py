@@ -43,6 +43,9 @@ def analyser_cycle_et_prévoir_paiements():
     # 6️⃣ 新建列【应付未付】
     df_gestion_unpaid['应付未付'] = df_gestion_unpaid['发票金额'].fillna(0) - df_gestion_unpaid['实际支付金额'].fillna(0)
 
+    #st.markdown("### df_gestion_unpaid")
+    #st.dataframe(df_gestion_unpaid)
+
 
     #st.markdown("<br>", unsafe_allow_html=True)  # 插入1行空白
     st.markdown(f"### ⌛ 各公司付款周期分析 - 天数统计")
@@ -52,6 +55,9 @@ def analyser_cycle_et_prévoir_paiements():
 
     # 1. 计算每张发票的付款天数
     df_paid_days['付款天数'] = (df_paid_days['开支票日期'] - df_paid_days['发票日期']).dt.days
+
+    #st.dataframe(df_paid_days)
+
 
     # 2. 分组统计：每个公司+部门的付款天数指标
     result_paid_days = df_paid_days.groupby(['部门','公司名称',]).agg(
@@ -177,6 +183,9 @@ def analyser_cycle_et_prévoir_paiements():
     # 6️⃣ 统计总额（仅对是否应付为True的行）
     df_due_this_week = df_paid_forest[df_paid_forest['是否本周应付'] == True].copy()
 
+    #st.info('df_due_this_week')
+    #st.dataframe(df_due_this_week)
+
     total_due_this_week = df_due_this_week['应付未付'].sum()
 
     by_department_pay_this_week = df_due_this_week.groupby('部门')['应付未付'].sum().reset_index().sort_values(by='应付未付', ascending=False)
@@ -190,6 +199,7 @@ def analyser_cycle_et_prévoir_paiements():
     
     #st.dataframe(by_department_pay_this_week)
     #st.dataframe(by_department_company_pay_this_week)
+    #st.info("df_paid_forest")
     #st.dataframe(df_paid_forest)
 
 
@@ -211,7 +221,7 @@ def analyser_cycle_et_prévoir_paiements():
     # ------------------------------
     # 🎛️ 选择展示内容
     # ------------------------------
-    forecast_view = st.radio("请选择要查看的付款预测图表：", ["按部门汇总", "查看部门下公司明细"], horizontal=True)
+    forecast_view = st.radio("请选择要查看的付款预测图表：", ["按部门汇总", "查看部门下公司明细", "预测付款明细"], horizontal=True)
 
     # ------------------------------
     # 📊 部门级预测图
@@ -231,15 +241,55 @@ def analyser_cycle_et_prévoir_paiements():
         fig_dept.update_layout(xaxis_tickangle=-30)
         st.plotly_chart(fig_dept, use_container_width=True)
 
-    # ------------------------------
-    # 📋 选择部门查看公司明细
-    # ------------------------------
-    elif forecast_view == "查看部门下公司明细":
-        selected_forecast_dept = st.selectbox("请选择一个部门查看公司预测明细：", by_department_pay_this_week['部门'].unique())
+
+    # -----------------------------
+    # ✅ 逻辑入口：查看部门下公司明细
+    # -----------------------------
+    if forecast_view == "查看部门下公司明细":
+
+        # ✅ 1. 用户选择部门
+        selected_forecast_dept = st.selectbox(
+            "📌 请选择一个部门查看公司预测明细：",
+            by_department_pay_this_week['部门'].dropna().unique()
+        )
+
+        # ✅ 2. 准备 df_paid_days 中最近的发票日期、支票日期、支票号、支票总额
+        df_invoice_date = df_paid_days.copy()
+
+        # 确保日期为 datetime 类型
+        df_invoice_date['发票日期'] = pd.to_datetime(df_invoice_date['发票日期'], errors='coerce')
+        df_invoice_date['开支票日期'] = pd.to_datetime(df_invoice_date['开支票日期'], errors='coerce')
+
+        # ✅ 提取每个（部门，公司）组最近的一条记录
+        latest_invoice_info = (
+            df_invoice_date
+            .sort_values(by=['发票日期', '开支票日期'], ascending=False)
+            .dropna(subset=['发票日期', '开支票日期'])
+            .groupby(['部门', '公司名称'], as_index=False)
+            .first()[['部门', '公司名称', '发票日期', '开支票日期', '付款支票号', '付款支票总额']]
+        )
+
+        # ✅ 3. 选定部门下的数据并合并最近发票信息
         filtered_forecast = by_department_company_pay_this_week[
             by_department_company_pay_this_week['部门'] == selected_forecast_dept
-        ]
+        ].copy()
 
+        filtered_forecast = filtered_forecast.merge(
+            latest_invoice_info,
+            on=['部门', '公司名称'],
+            how='left'
+        )
+
+        # ✅ 4. 构建 hover 提示文本
+        filtered_forecast['hover_text'] = (
+            "应付款: " + filtered_forecast['应付未付'].map('{:,.2f}'.format) + " 元<br>" +
+            "最近付款发票日期: " + filtered_forecast['发票日期'].astype(str) + "<br>" +
+            "最近开支票日期: " + filtered_forecast['开支票日期'].astype(str) + "<br>" +
+            "支票号: " + filtered_forecast['付款支票号'].astype(str) + "<br>" +
+            "付款支票总额: " + filtered_forecast['付款支票总额'].map('{:,.2f}'.format)
+        )
+
+        # ✅ 5. 创建柱状图
         fig_company = px.bar(
             filtered_forecast,
             x='公司名称',
@@ -248,12 +298,205 @@ def analyser_cycle_et_prévoir_paiements():
             color='应付未付',
             color_continuous_scale='Oranges',
             labels={'应付未付': '应付款金额'},
-            title=f"{selected_forecast_dept} 部门 - 本周应付款公司明细"
+            title=f"{selected_forecast_dept} 部门 - 本周应付款公司明细",
+            hover_data={'hover_text': True, '应付未付': False, '公司名称': False}
         )
-        fig_company.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+
+        # ✅ 6. 图表美化
+        fig_company.update_traces(
+            texttemplate='%{text:.2f}',
+            textposition='outside',
+            hovertemplate='%{customdata[0]}<extra></extra>'
+        )
         fig_company.update_layout(xaxis_tickangle=-30)
+
+        # ✅ 7. 展示图表
+        st.plotly_chart(fig_company, use_container_width=True)
+        
+
+        # -----------------------------
+    # ✅ 逻辑入口：查看部门下公司明细
+    # -----------------------------
+    if forecast_view == "预测付款明细":
+
+
+        # ✅ 1. 汇总本周每家公司的应付未付金额（从 df_due_this_week）
+        by_company_pay_this_week = (
+            df_due_this_week
+            .groupby('公司名称')['应付未付']
+            .sum()
+            .reset_index()
+            .sort_values(by='应付未付', ascending=False)
+        )
+
+        # ✅ 显示中间数据（可选）
+        #st.info("📊 每家公司本周应付款汇总")
+        #st.dataframe(by_company_pay_this_week)
+
+        # ✅ 2. 从 df_paid_days 提取每家公司最近的付款发票记录
+        df_invoice_date = df_paid_days.copy()
+
+
+        # ✅ 每家公司：取最近一条记录（按发票日期 + 开支票日期倒序排序）
+        latest_invoice_info = (
+            df_invoice_date
+            .sort_values(by=['发票日期', '开支票日期'], ascending=False)
+            .dropna(subset=['发票日期', '开支票日期'])
+            .groupby('公司名称', as_index=False)
+            .first()[['公司名称', '发票日期', '开支票日期', '付款支票号', '付款支票总额']]
+        )
+
+        # ✅ 3. 从 df_paid_days 提取付款天数中位数
+        result_paid_days_company = (
+            df_paid_days
+            .groupby('公司名称')
+            .agg(付款天数中位数=('付款天数', 'median'))
+            .reset_index()
+            .round(2)
+        )
+
+        # ✅ 4. 合并以上三表构造最终预测表：filtered_forecast
+        filtered_forecast = (
+            by_company_pay_this_week
+            .merge(latest_invoice_info, on='公司名称', how='left')
+            .merge(result_paid_days_company, on='公司名称', how='left')
+        )
+
+        # ✅ 展示结果
+        #st.subheader("📋 公司级别 - 应付款 + 最近付款记录 + 支付周期")
+        #st.dataframe(filtered_forecast, use_container_width=True)
+
+        #st.dataframe(result_paid_days_company)
+
+
+        #st.info(f"filtered_forecast")
+        #st.dataframe(filtered_forecast)
+
+        # ✅ 4. 构建 hover 提示文本
+        filtered_forecast['hover_text'] = (
+            "公司名称: " + filtered_forecast['公司名称'].astype(str) + "<br>" +
+            "应付款: " + filtered_forecast['应付未付'].map('{:,.2f}'.format) + " 元<br>" +
+            "付款账期中位数: " + filtered_forecast['付款天数中位数'].map('{:,.0f}'.format) + " 天<br><br>" +  # ← 添加额外换行
+            "最近付款发票日期: " + filtered_forecast['发票日期'].astype(str) + "<br>" +
+            "最近开支票日期: " + filtered_forecast['开支票日期'].astype(str) + "<br>" +
+            "支票号: " + filtered_forecast['付款支票号'].astype(str) + "<br>" +
+            "付款支票总额: " + filtered_forecast['付款支票总额'].map('{:,.2f}'.format)
+        )
+
+
+        # ✅ 5. 创建柱状图
+        fig_company = px.bar(
+            filtered_forecast,
+            x='公司名称',
+            y='应付未付',
+            text='应付未付',
+            color='应付未付',
+            color_continuous_scale='Oranges',
+            labels={'应付未付': '应付款金额'},
+            #title=f"{selected_forecast_dept} 部门 - 本周应付款公司明细",
+            hover_data={'hover_text': True, '应付未付': False, '公司名称': True}
+        )
+
+        # ✅ 6. 图表美化
+        fig_company.update_traces(
+            texttemplate='%{text:.2f}',
+            textposition='outside',
+            hovertemplate='%{customdata[0]}<extra></extra>'
+        )
+        fig_company.update_layout(xaxis_tickangle=-30)
+
+        # ✅ 7. 展示图表
         st.plotly_chart(fig_company, use_container_width=True)
 
+
+
+
+
+        # ✅ 1. 筛选出“是否本周应付”为 True 的数据
+        df_this_week = df_paid_forest[df_paid_forest['是否本周应付'] == True].copy()
+
+        # ✅ 2. 按“发票号”分组并汇总发票金额和实际支付金额
+        grouped_cheque = df_this_week.groupby('发票号', as_index=False)[
+            ['发票金额', '实际支付金额']
+        ].sum().round(2)
+
+        # ✅ 3. 计算“应付未付”字段
+        grouped_cheque['应付未付'] = grouped_cheque['发票金额'] - grouped_cheque['实际支付金额']
+
+        # ✅ 4. 过滤掉“应付未付”为 0 的行
+        grouped_cheque = grouped_cheque[grouped_cheque['应付未付'] != 0]
+
+        # ✅ 5. 获取这些“发票号”作为布林码条件
+        valid_invoice_ids = grouped_cheque['发票号'].unique()
+
+        # ✅ 6. 回到原始数据中，筛选出这些发票号对应的明细行
+        filtered_invoice_details = df_this_week[df_this_week['发票号'].isin(valid_invoice_ids)].copy()
+
+        # ✅ 7. 展示最终筛选出的原始数据
+        #st.subheader("📋 存在应付未付的发票明细")
+        #st.dataframe(filtered_invoice_details, use_container_width=True)
+
+        # ✅ 指定需要显示的字段
+        display_columns = [
+            '公司名称', '部门', '发票号', '发票日期','发票金额', '应付未付',
+            '预计付款日', '付款支票号', '实际支付金额', '付款支票总额'
+        ]
+
+        # ✅ 确保日期字段格式正确
+        date_columns = ['预计付款日','发票日期']
+        for col in date_columns:
+            filtered_invoice_details[col] = pd.to_datetime(filtered_invoice_details[col], errors='coerce').dt.strftime('%Y-%m-%d')   
         
-    #st.dataframe(by_department_company_pay_this_week)
-    #st.dataframe(df_paid_forest)
+        
+        # ✅ 折叠模块
+        with st.expander("📂 点击展开查看本周存在应付未付的发票详情", expanded=False):
+
+            # 1️⃣ 公司选择框（带搜索提示）
+            selected_company = st.selectbox(
+                "🔍 请选择要查看的公司：",
+                options=sorted(filtered_invoice_details['公司名称'].dropna().unique().tolist()),
+                index=None,
+                placeholder="输入或选择公司名称进行查看"
+            )
+
+            # 2️⃣ 用户未选择公司，不显示任何数据
+            if selected_company:
+                # 3️⃣ 筛选出该公司数据，按发票日期升序
+                company_df = filtered_invoice_details[
+                    filtered_invoice_details['公司名称'] == selected_company
+                ].copy().sort_values(by='发票日期')
+
+                # 4️⃣ 保留显示字段
+                display_df = company_df[display_columns].copy()
+
+                # ✅ 汇总金额列
+                amount_cols = ['发票金额', '应付未付', '实际支付金额', '付款支票总额']
+                summary_row = display_df[amount_cols].sum().round(2)
+                summary_row['公司名称'] = '总计'
+                summary_row['部门'] = ''
+                summary_row['发票号'] = ''
+                summary_row['预计付款日'] = ''
+                summary_row['付款支票号'] = ''
+                display_df = pd.concat([display_df, pd.DataFrame([summary_row])], ignore_index=True)
+
+                # ✅ 样式函数：最后一行高亮为淡蓝色
+                def highlight_total_row(row):
+                    return ['background-color: #e6f0ff'] * len(row) if row['公司名称'] == '总计' else [''] * len(row)
+
+                # ✅ 展示样式表格
+                styled_df = (
+                    display_df
+                    .style
+                    .apply(highlight_total_row, axis=1)
+                    .format({col: '{:,.2f}' for col in amount_cols})
+                )
+
+                # ✅ 展示数据
+                st.dataframe(styled_df, use_container_width=True)
+
+
+
+
+
+
+

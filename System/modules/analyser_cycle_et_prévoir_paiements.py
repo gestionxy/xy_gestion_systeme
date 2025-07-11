@@ -409,7 +409,8 @@ def analyser_cycle_et_prévoir_paiements():
         st.plotly_chart(fig_company, use_container_width=True)
 
 
-
+        #st.info("⚠️ 注意：以下图表仅展示本周应付未付金额大于 0 的公司。")
+        #st.dataframe(df_gestion_unpaid)
 
 
         # ✅ 1. 筛选出“是否本周应付”为 True 的数据
@@ -451,48 +452,120 @@ def analyser_cycle_et_prévoir_paiements():
         # ✅ 折叠模块
         with st.expander("📂 点击展开查看本周存在应付未付的发票详情", expanded=False):
 
-            # 1️⃣ 公司选择框（带搜索提示）
-            selected_company = st.selectbox(
-                "🔍 请选择要查看的公司：",
-                options=sorted(filtered_invoice_details['公司名称'].dropna().unique().tolist()),
-                index=None,
-                placeholder="输入或选择公司名称进行查看"
+            # ✅ 选择查看模式：预测未付 or 全部应付未付
+            view_mode = st.radio(
+                "请选择查看模式：",
+                ["📊 预测未付应付", "📋 全部应付未付"],
+                horizontal=True
             )
 
-            # 2️⃣ 用户未选择公司，不显示任何数据
-            if selected_company:
-                # 3️⃣ 筛选出该公司数据，按发票日期升序
-                company_df = filtered_invoice_details[
-                    filtered_invoice_details['公司名称'] == selected_company
-                ].copy().sort_values(by='发票日期')
+            # ✅ 模式 1：预测未付应付（使用原始 filtered_invoice_details）
+            if view_mode == "📊 预测未付应付":
 
-                # 4️⃣ 保留显示字段
-                display_df = company_df[display_columns].copy()
-
-                # ✅ 汇总金额列
-                amount_cols = ['发票金额', '应付未付', '实际支付金额', '付款支票总额']
-                summary_row = display_df[amount_cols].sum().round(2)
-                summary_row['公司名称'] = '总计'
-                summary_row['部门'] = ''
-                summary_row['发票号'] = ''
-                summary_row['预计付款日'] = ''
-                summary_row['付款支票号'] = ''
-                display_df = pd.concat([display_df, pd.DataFrame([summary_row])], ignore_index=True)
-
-                # ✅ 样式函数：最后一行高亮为淡蓝色
-                def highlight_total_row(row):
-                    return ['background-color: #e6f0ff'] * len(row) if row['公司名称'] == '总计' else [''] * len(row)
-
-                # ✅ 展示样式表格
-                styled_df = (
-                    display_df
-                    .style
-                    .apply(highlight_total_row, axis=1)
-                    .format({col: '{:,.2f}' for col in amount_cols})
+                # 公司选择器
+                selected_company = st.selectbox(
+                    "🔍 请选择要查看的公司（预测数据）：",
+                    options=sorted(filtered_invoice_details['公司名称'].dropna().unique().tolist()),
+                    index=None,
+                    placeholder="输入或选择公司名称"
                 )
 
-                # ✅ 展示数据
-                st.dataframe(styled_df, use_container_width=True)
+                if selected_company:
+                    company_df = (
+                        filtered_invoice_details[filtered_invoice_details['公司名称'] == selected_company]
+                        .copy().sort_values(by='发票日期')
+                    )
+                    display_df = company_df[display_columns].copy()
+
+                    # 汇总行
+                    amount_cols = ['发票金额', '应付未付', '实际支付金额', '付款支票总额']
+                    summary_row = display_df[amount_cols].sum().round(2)
+                    summary_row['公司名称'] = '总计'
+                    summary_row['部门'] = ''
+                    summary_row['发票号'] = ''
+                    summary_row['预计付款日'] = ''
+                    summary_row['付款支票号'] = ''
+                    display_df = pd.concat([display_df, pd.DataFrame([summary_row])], ignore_index=True)
+
+                    # 样式
+                    def highlight_total_row(row):
+                        return ['background-color: #e6f0ff'] * len(row) if row['公司名称'] == '总计' else [''] * len(row)
+
+                    styled_df = (
+                        display_df
+                        .style
+                        .apply(highlight_total_row, axis=1)
+                        .format({col: '{:,.2f}' for col in amount_cols})
+                    )
+
+                    st.dataframe(styled_df, use_container_width=True)
+
+            # ✅ 模式 2：全部应付未付（来自 df_gestion_unpaid）
+            elif view_mode == "📋 全部应付未付":
+
+                # 数据处理
+                df_unpaid_total = df_gestion_unpaid.copy()
+                df_unpaid_total = df_unpaid_total.groupby('发票号', as_index=False).agg({
+                    '发票金额': 'sum',
+                    'TPS': 'sum',
+                    'TVQ': 'sum',
+                    '应付未付': 'sum',
+                    '公司名称': 'first',
+                    '部门': 'first',
+                    '发票日期': 'first'
+                })
+                df_unpaid_total = df_unpaid_total[df_unpaid_total['应付未付'] != 0]
+
+                # 公司选择器
+                selected_company_all = st.selectbox(
+                    "🔍 请选择要查看的公司（全部应付未付）：",
+                    options=sorted(df_unpaid_total['公司名称'].dropna().unique().tolist()),
+                    index=None,
+                    placeholder="输入或选择公司名称"
+                )
+
+                if selected_company_all:
+                    company_df = (
+                        df_unpaid_total[df_unpaid_total['公司名称'] == selected_company_all]
+                        .copy().sort_values(by='发票日期')
+                    )
+
+                    # 补全 display_columns 中没有的列
+                    for col in display_columns:
+                        if col not in company_df.columns:
+                            company_df[col] = ''
+
+                    display_df = company_df[display_columns].copy()
+
+                    # 汇总
+                    amount_cols = ['发票金额', '应付未付']
+                    for col in amount_cols:
+                        if col not in display_df.columns:
+                            display_df[col] = 0.0
+
+                    summary_row = display_df[amount_cols].sum().round(2)
+                    summary_row['公司名称'] = '总计'
+                    summary_row['部门'] = ''
+                    summary_row['发票号'] = ''
+                    summary_row['发票日期'] = ''
+                    display_df = pd.concat([display_df, pd.DataFrame([summary_row])], ignore_index=True)
+
+                    
+
+                    # 样式
+                    def highlight_total_row(row):
+                        return ['background-color: #e6f0ff'] * len(row) if row['公司名称'] == '总计' else [''] * len(row)
+
+                    styled_df = (
+                        display_df
+                        .style
+                        .apply(highlight_total_row, axis=1)
+                        .format({col: '{:,.2f}' for col in amount_cols})
+                    )
+
+                    st.dataframe(styled_df, use_container_width=True)
+
+
 
 
 
