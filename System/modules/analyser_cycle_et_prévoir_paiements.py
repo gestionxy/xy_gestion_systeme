@@ -455,12 +455,12 @@ def analyser_cycle_et_prévoir_paiements():
             # ✅ 选择查看模式：预测未付 or 全部应付未付
             view_mode = st.radio(
                 "请选择查看模式：",
-                ["📊 预测未付应付", "📋 全部应付未付"],
+                ["📈 预测未付应付", "📑 全部应付未付", "💵 已付信息查询", "🧾 已付支票号查询"],
                 horizontal=True
             )
 
             # ✅ 模式 1：预测未付应付（使用原始 filtered_invoice_details）
-            if view_mode == "📊 预测未付应付":
+            if view_mode == "📈 预测未付应付":
 
                 # 公司选择器
                 selected_company = st.selectbox(
@@ -501,7 +501,7 @@ def analyser_cycle_et_prévoir_paiements():
                     st.dataframe(styled_df, use_container_width=True)
 
             # ✅ 模式 2：全部应付未付（来自 df_gestion_unpaid）
-            elif view_mode == "📋 全部应付未付":
+            elif view_mode == "📑 全部应付未付":
 
                 # 数据处理
                 df_unpaid_total = df_gestion_unpaid.copy()
@@ -564,6 +564,100 @@ def analyser_cycle_et_prévoir_paiements():
                     )
 
                     st.dataframe(styled_df, use_container_width=True)
+            
+            elif view_mode == "💵 已付信息查询":
+                
+                # 假设 df_paid_days 已加载
+                df_paid = df_paid_days.copy()
+
+                # ✅ 设定展示字段
+                display_columns = [
+                    '公司名称', '发票号', '发票日期', '发票金额',
+                    '付款支票号', '实际支付金额', '付款支票总额',
+                    '开支票日期', '银行对账日期'
+                ]
+
+                # ✅ 公司名称搜索框
+                company_list = sorted(df_paid['公司名称'].dropna().unique().tolist())
+                selected_company = st.selectbox(
+                    "🔍 请输入或选择公司名称查看已开支票信息：",
+                    options=company_list,
+                    index=None,
+                    placeholder="输入公司名称..."
+                )
+
+                # ✅ 过滤并显示结果
+                if selected_company:
+                    filtered_df = df_paid[df_paid['公司名称'] == selected_company].copy()
+
+                    # ⏰ 转换日期列格式
+                    date_cols = ['发票日期', '开支票日期', '银行对账日期']
+                    for col in date_cols:
+                        filtered_df[col] = pd.to_datetime(filtered_df[col], errors='coerce').dt.strftime('%Y-%m-%d')
+
+                    # 📌 按发票日期从大到小排序
+                    filtered_df = filtered_df.sort_values(by='发票日期', ascending=False)
+
+                    # 📋 提取所需字段
+                    result_df = filtered_df[display_columns]
+
+                    st.dataframe(result_df, use_container_width=True)
+
+                
+
+            elif view_mode == "🧾 已付支票号查询":
+
+
+                # 假设 df_paid_days 已加载
+                df_cheque = df_paid_days.copy()
+
+                # ✅ 设定展示字段
+                display_columns = [
+                    '公司名称', '发票号', '发票日期', '发票金额',
+                    '付款支票号', '实际支付金额', '付款支票总额',
+                    '开支票日期', '银行对账日期'
+                ]
+
+                # ✅ 支票号搜索框
+                cheque_list = sorted(df_cheque['付款支票号'].dropna().astype(str).unique().tolist())
+                selected_cheque = st.selectbox(
+                    "🔍 请输入或选择支票号查看付款信息：",
+                    options=cheque_list,
+                    index=None,
+                    placeholder="输入支票号..."
+                )
+
+                # ✅ 若选择了支票号，显示对应信息
+                if selected_cheque:
+                    filtered_df = df_cheque[df_cheque['付款支票号'] == selected_cheque].copy()
+
+                    # ⏰ 格式化日期列
+                    date_cols = ['发票日期', '开支票日期', '银行对账日期']
+                    for col in date_cols:
+                        filtered_df[col] = pd.to_datetime(filtered_df[col], errors='coerce').dt.strftime('%Y-%m-%d')
+
+                    # 💰 保留两位小数的金额列
+                    amount_cols = ['发票金额', '实际支付金额', '付款支票总额']
+                    for col in amount_cols:
+                        filtered_df[col] = pd.to_numeric(filtered_df[col], errors='coerce').round(2)
+
+                    # ➕ 计算差额列 = 发票金额 - 实际支付金额
+                    filtered_df['差额'] = (filtered_df['发票金额'] - filtered_df['实际支付金额']).round(2)
+
+                    # 📌 按发票日期从大到小排序
+                    filtered_df = filtered_df.sort_values(by='发票日期', ascending=False)
+
+                    # ✅ 自定义字段顺序，将“差额”插入到“付款支票总额”之后
+                    base_columns = [
+                        '公司名称', '发票号', '发票日期', '发票金额',
+                        '付款支票号', '实际支付金额', '付款支票总额'
+                    ]
+                    final_columns = base_columns + ['差额', '开支票日期', '银行对账日期']
+
+                    result_df = filtered_df[final_columns]
+
+                    st.dataframe(result_df, use_container_width=True)
+
 
 
 
