@@ -10,6 +10,11 @@ def analyser_cycle_et_prévoir_paiements():
 
     df = load_supplier_data()
 
+
+    # 1.1 首先排除出 直接用信用卡VISA-1826 进行支付的，信用卡支付的不是公司支票账户
+    #df = df[~df['公司名称'].isin(['SLEEMAN', 'Arc-en-ciel','Ferme vallee verte'])]
+    df = df[~df['公司名称'].isin(['SLEEMAN', 'Arc-en-ciel'])]
+
     # 过滤掉 “发票金额”和“实际支付金额”两列的 都为0的数据行
     # 发票金额 = 实际支付金额 = 0， 表示void 取消的的支票，不再纳入我们的统计中
     # 因为会影响后续 付款账期计算 以及 统计该公司的 发票数量
