@@ -34,6 +34,8 @@ def analyser_cycle_et_prévoir_paiements():
 
     # 会计版，相对复杂，统计口径以 银行对账单为准
 
+    
+
     # 3️⃣ 筛选结尾为 "*" 的公司名，且开支票日期为空的行 ==> 我们要自动处理这些自动扣款的业务
     # 结尾为 "*" 的公司代表 这些公司使用的 自动扣款模式，因此我们要自动化处理扣款支付
     mask_star_company = df_gestion_unpaid['公司名称'].astype(str).str.endswith("*")
