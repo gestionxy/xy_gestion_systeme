@@ -28,6 +28,12 @@ def load_supplier_data():
             df[col] = df[col].astype(str)
 
     
+    # 强制转换成 数值格式，避免出现 字符串而无法进行计算
+    amount_columns = ['发票金额', 'TPS', 'TVQ', '实际支付金额', '付款支票总额']
+    for col in amount_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
     return df
 
 

@@ -54,7 +54,7 @@ def analyser_cycle_et_prévoir_paiements():
     df_gestion_unpaid.loc[condition_overdue, '付款支票总金额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
 
     # 6️⃣ 新建列【应付未付】
-    #df_gestion_unpaid['应付未付'] = df_gestion_unpaid['发票金额'].fillna(0) - df_gestion_unpaid['实际支付金额'].fillna(0)
+    # 实际这一步转换可以省略，因为我们在导入数据时data_loader.py 中已经进行了强制 数值转换
     amount_cols = ['发票金额', '实际支付金额']
     df_gestion_unpaid[amount_cols] = df_gestion_unpaid[amount_cols].apply(pd.to_numeric, errors='coerce')
 
