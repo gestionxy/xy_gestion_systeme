@@ -27,6 +27,7 @@ def load_supplier_data():
         if col in df.columns:
             df[col] = df[col].astype(str)
 
+    
     return df
 
 

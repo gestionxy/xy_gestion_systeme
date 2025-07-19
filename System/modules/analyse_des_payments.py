@@ -71,6 +71,11 @@ def analyse_des_payments():
         df_gestion_unpaid.loc[condition_overdue, '发票金额']
 
     # 9️⃣ 计算“应付未付金额”列
+
+    amount_cols = ['发票金额', '实际支付金额']
+    df_gestion_unpaid[amount_cols] = df_gestion_unpaid[amount_cols].apply(pd.to_numeric, errors='coerce')
+
+    
     df_gestion_unpaid['应付未付'] = (
         df_gestion_unpaid['发票金额'].fillna(0) - df_gestion_unpaid['实际支付金额'].fillna(0)
     )

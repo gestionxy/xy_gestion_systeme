@@ -41,6 +41,10 @@ def analyse_des_impayes():
     df_gestion_unpaid.loc[condition_overdue, '付款支票总金额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
 
     # 6️⃣ 新建列【应付未付】
+
+    amount_cols = ['发票金额', '实际支付金额']
+    df_gestion_unpaid[amount_cols] = df_gestion_unpaid[amount_cols].apply(pd.to_numeric, errors='coerce')
+
     df_gestion_unpaid['应付未付'] = df_gestion_unpaid['发票金额'].fillna(0) - df_gestion_unpaid['实际支付金额'].fillna(0)
 
     # 7️⃣ 汇总应付未付总额、各部门汇总、各公司汇总
