@@ -51,7 +51,7 @@ def analyser_cycle_et_prévoir_paiements():
     # 5️⃣ 对满足条件的行进行赋值操作
     df_gestion_unpaid.loc[condition_overdue, '开支票日期'] = df_gestion_unpaid.loc[condition_overdue, '发票日期'] + pd.Timedelta(days=10)
     df_gestion_unpaid.loc[condition_overdue, '实际支付金额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
-    df_gestion_unpaid.loc[condition_overdue, '付款支票总金额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
+    df_gestion_unpaid.loc[condition_overdue, '付款支票总额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
 
     # 6️⃣ 新建列【应付未付】
     # 实际这一步转换可以省略，因为我们在导入数据时data_loader.py 中已经进行了强制 数值转换
@@ -569,6 +569,49 @@ def analyser_cycle_et_prévoir_paiements():
                     display_df = pd.concat([display_df, pd.DataFrame([summary_row])], ignore_index=True)
 
                     display_df['发票日期'] = pd.to_datetime(display_df['发票日期'], errors='coerce').dt.strftime('%Y-%m-%d')
+
+
+
+
+                    # 增加 预测付款日期 以及 付款天数中位数 两列信息，方便用户查看使用
+                    
+                    # 首先使用 本节部分的数据集 display_df， 以及在开始时计算的 result_paid_days 按照 部门 + 公司名称 计算出来的付款天数中位数
+                    # 将两个数据集进行 merge 合并
+                    display_df = display_df.merge(
+                        result_paid_days[['部门', '公司名称', '付款天数中位数']],
+                        on=['部门', '公司名称'],
+                        how='left'
+                    )
+
+                    # 因为涉及到后面的日期相加，因此不必须保证是 日期格式 和 数值格式 
+                    # 发票日期必须是 datetime 类型
+                    display_df['发票日期'] = pd.to_datetime(display_df['发票日期'], errors='coerce')
+
+                    # 中位付款天数必须是数字
+                    display_df['付款天数中位数'] = pd.to_numeric(display_df['付款天数中位数'], errors='coerce')
+
+                    # 生成 timedelta 类型
+                    timedelta_days = pd.to_timedelta(display_df['付款天数中位数'], unit='D')
+
+
+                    # 构造掩码：只有在发票日期和付款天数都存在时才进行运算
+                    mask_valid = display_df['发票日期'].notna() & timedelta_days.notna()
+
+                    # 初始化结果列为 NaT
+                    display_df['预计付款日'] = pd.NaT
+
+                    # 执行有效行的加法操作
+                    display_df.loc[mask_valid, '预计付款日'] = display_df.loc[mask_valid, '发票日期'] + timedelta_days[mask_valid]
+
+                    # 为了显示，将日期转换为字符串
+                    display_df['发票日期'] = pd.to_datetime(display_df['发票日期'], errors='coerce').dt.strftime('%Y-%m-%d')
+                    display_df['预计付款日'] = display_df['预计付款日'].dt.strftime('%Y-%m-%d')
+                    
+                    # 在 Streamlit 中直接格式化显示 不想显示为50.0000000  而只是显示为 50
+                    # .round(0).astype('Int64') 
+                    # 是否会影响数值计算？   ✅ 会 改变原始的浮点数精度，但只要你不再需要小数部分，就不会有问题。
+                    display_df['付款天数中位数'] = display_df['付款天数中位数'].round(0).astype('Int64')
+
 
                     
 

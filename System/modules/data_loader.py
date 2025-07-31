@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+import numpy as np
 
 # 加载数据函数，设置缓存时间为 10 秒
 @st.cache_data(ttl=3600)
@@ -14,6 +15,29 @@ def load_supplier_data():
     # 读取 CSV 数据（从 Google Sheets）
     df = pd.read_csv(csv_url)
     df = df.dropna(how='all')
+
+
+
+
+    # 设置特殊标识符，以控制 某些列是否应该清除
+    #比如，当下我记录了，但是不想显示，因此在 特殊标记清除 列 标记为 1 ， 电脑自动清除 '付款支票号', '实际支付金额', '付款支票总额', '开支票日期' 这些列的数据
+    # 就像没有记录一样 
+
+    # 确保列是标准数值或文本类型
+    df['特殊标记清除'] = pd.to_numeric(df['特殊标记清除'], errors='coerce')
+
+    # 指定要清除的列
+    cols_to_clear = ['付款支票号', '实际支付金额', '付款支票总额', '开支票日期']
+
+    # 找出需要清除的行
+    mask_clear = df['特殊标记清除'] == 1
+
+    # 将这些列设为真正的“未填写”状态（缺失值）
+    df.loc[mask_clear, cols_to_clear] = np.nan
+
+
+
+
 
     # 自动转换常用日期字段为 datetime 类型（可按需扩展）
     date_columns = ['开支票日期', '发票日期','银行对账日期']
