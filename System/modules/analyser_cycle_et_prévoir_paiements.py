@@ -621,6 +621,9 @@ def analyser_cycle_et_prévoir_paiements():
 
 
 
+
+                    # ✅ 新增 累计未付金额 列， 统计 累计未付金额 总额 
+
                     # ✅ 第1步：确保“应付未付”为数值型，并计算“累计未付金额”
                     display_df['应付未付'] = pd.to_numeric(display_df['应付未付'], errors='coerce').fillna(0)
                     # ⬆️ 把“应付未付”这一列转为数值型（如果有无法识别的内容就转成NaN），并用0填充缺失值
@@ -673,7 +676,9 @@ def analyser_cycle_et_prévoir_paiements():
                     # ⬆️ 表格占满宽度显示
 
 
-                    
+
+
+
             
             elif view_mode == "💵 已付信息查询":
                 
