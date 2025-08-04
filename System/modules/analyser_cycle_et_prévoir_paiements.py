@@ -556,20 +556,20 @@ def analyser_cycle_et_prévoir_paiements():
 
                     display_df = company_df[display_columns].copy()
 
-                    # 汇总
-                    amount_cols = ['发票金额', '应付未付']
-                    for col in amount_cols:
-                        if col not in display_df.columns:
-                            display_df[col] = 0.0
+                    # # 汇总
+                    # amount_cols = ['发票金额', '应付未付']
+                    # for col in amount_cols:
+                    #     if col not in display_df.columns:
+                    #         display_df[col] = 0.0
 
-                    summary_row = display_df[amount_cols].sum().round(2)
-                    summary_row['公司名称'] = '总计'
-                    summary_row['部门'] = ''
-                    summary_row['发票号'] = ''
-                    summary_row['发票日期'] = ''
-                    display_df = pd.concat([display_df, pd.DataFrame([summary_row])], ignore_index=True)
+                    # summary_row = display_df[amount_cols].sum().round(2)
+                    # summary_row['公司名称'] = '总计'
+                    # summary_row['部门'] = ''
+                    # summary_row['发票号'] = ''
+                    # summary_row['发票日期'] = ''
+                    # display_df = pd.concat([display_df, pd.DataFrame([summary_row])], ignore_index=True)
 
-                    display_df['发票日期'] = pd.to_datetime(display_df['发票日期'], errors='coerce').dt.strftime('%Y-%m-%d')
+                    # display_df['发票日期'] = pd.to_datetime(display_df['发票日期'], errors='coerce').dt.strftime('%Y-%m-%d')
 
 
 
