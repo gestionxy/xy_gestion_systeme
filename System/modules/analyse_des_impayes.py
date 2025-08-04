@@ -12,19 +12,36 @@ def analyse_des_impayes():
 
     df = load_supplier_data()
 
+
+    # 此步骤处理与 analyser_cycle_et_prevoir_paiements.py 中，处理逻辑一致
+
+    # 1.1 首先排除出 直接用信用卡VISA-1826 进行支付的，信用卡支付的不是公司支票账户
+    #df = df[~df['公司名称'].isin(['SLEEMAN', 'Arc-en-ciel','Ferme vallee verte'])]
+    df = df[~df['公司名称'].isin(['SLEEMAN', 'Arc-en-ciel'])]
+
+    # 过滤掉 “发票金额”和“实际支付金额”两列的 都为0的数据行
+    # 发票金额 = 实际支付金额 = 0， 表示void 取消的的支票，不再纳入我们的统计中
+    # 因为会影响后续 付款账期计算 以及 统计该公司的 发票数量
+    df = df[~((df['发票金额'] == 0) & (df['实际支付金额'] == 0))]
+
+
     df['发票日期'] = pd.to_datetime(df['发票日期'], errors='coerce')
     df['开支票日期'] = pd.to_datetime(df['开支票日期'], errors='coerce')
-
-
 
     # 2️⃣ 获取当前日期
     current_date = pd.to_datetime(datetime.today().date())
 
-
     df_gestion_unpaid = df.copy()
 
+    # 管理版中，应付未付的统计口径是看是否有 开支票日期， 如果存在 开支票日期 ， 则默认已经支付成功了
+    # 对于 【公司名*】 自动扣款的，这个 开支票日期 就需要自动设置
 
-    # 3️⃣ 筛选结尾为 "*" 的公司名，且开支票日期为空的行
+    # 会计版，相对复杂，统计口径以 银行对账单为准
+
+    
+
+    # 3️⃣ 筛选结尾为 "*" 的公司名，且开支票日期为空的行 ==> 我们要自动处理这些自动扣款的业务
+    # 结尾为 "*" 的公司代表 这些公司使用的 自动扣款模式，因此我们要自动化处理扣款支付
     mask_star_company = df_gestion_unpaid['公司名称'].astype(str).str.endswith("*")
     mask_no_cheque_date = df_gestion_unpaid['开支票日期'].isna()
     mask_star_and_pending = mask_star_company & mask_no_cheque_date
@@ -38,17 +55,20 @@ def analyse_des_impayes():
     # 5️⃣ 对满足条件的行进行赋值操作
     df_gestion_unpaid.loc[condition_overdue, '开支票日期'] = df_gestion_unpaid.loc[condition_overdue, '发票日期'] + pd.Timedelta(days=10)
     df_gestion_unpaid.loc[condition_overdue, '实际支付金额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
-    df_gestion_unpaid.loc[condition_overdue, '付款支票总金额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
+    df_gestion_unpaid.loc[condition_overdue, '付款支票总额'] = df_gestion_unpaid.loc[condition_overdue, '发票金额']
 
     # 6️⃣ 新建列【应付未付】
-
+    # 实际这一步转换可以省略，因为我们在导入数据时data_loader.py 中已经进行了强制 数值转换
     amount_cols = ['发票金额', '实际支付金额']
     df_gestion_unpaid[amount_cols] = df_gestion_unpaid[amount_cols].apply(pd.to_numeric, errors='coerce')
 
     df_gestion_unpaid['应付未付'] = df_gestion_unpaid['发票金额'].fillna(0) - df_gestion_unpaid['实际支付金额'].fillna(0)
 
+
     # 7️⃣ 汇总应付未付总额、各部门汇总、各公司汇总
     total_unpaid = df_gestion_unpaid['应付未付'].sum()
+
+
 
     # 部门汇总
     by_department = (
