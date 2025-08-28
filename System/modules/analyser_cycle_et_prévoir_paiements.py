@@ -721,8 +721,21 @@ def analyser_cycle_et_prévoir_paiements():
 
                     # 新增列：付款差额 = 发票金额 - 实际支付金额
                     result_df['付款差额'] = result_df['发票金额'] - result_df['实际支付金额']
-                    # 新增列：累计付款差额 = 付款差额的累计值，保留两位小数
-                    result_df['累计付款差额'] = result_df['付款差额'].cumsum().round(2)
+                    
+                    # 新增列：累计付款差额 = 付款差额的累计值，保留两位小数 【倒序，从最下面开始计算】
+                    #result_df['累计付款差额'] = result_df['付款差额'].cumsum().round(2)
+                    
+                    
+                    # iloc[::-1] → 将 付款差额 列倒序。
+                    # .cumsum() → 按照倒序逐步累加。
+                    # [::-1] → 再把结果翻转回来，使其与原表的行顺序对齐。
+                    #.round(2) → 保留两位小数。
+                    result_df['累计付款差额'] = (
+                        result_df['付款差额'].iloc[::-1].cumsum()[::-1].round(2)
+                    )
+
+
+
                     # 写一个提示 st.info
                     st.info(
                         f"⚠️ 提示：本公司累计付款差额为：{result_df['付款差额'].sum():,.2f}"
