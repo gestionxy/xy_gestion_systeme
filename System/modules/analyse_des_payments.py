@@ -185,6 +185,35 @@ def analyse_des_payments():
         st.plotly_chart(fig_paid_month, key="monthly_paid_chart001")
 
 
+        # 增加空行
+        st.markdown("<br><br>", unsafe_allow_html=True)  # 两个换行
+
+
+
+
+
+        # 1️⃣ 加载原始数据
+        df_count_num_check = load_supplier_data()
+
+        # 假设 df 已经存在，包含“付款支票号”和“开支票日期”
+
+        # 1. 筛选付款支票号为数值（比如 int 或 float）
+        df_numeric = df_count_num_check[pd.to_numeric(df["付款支票号"], errors="coerce").notna()].copy()
+
+        # 2. 去重（同一个支票号只计算一次）
+        df_unique = df_numeric.drop_duplicates(subset=["付款支票号"])
+
+        # 3. 转换开支票日期为 datetime，并提取月份
+        df_unique["开支票日期"] = pd.to_datetime(df_unique["开支票日期"], errors="coerce")
+        df_unique["月份"] = df_unique["开支票日期"].dt.to_period("M")
+
+        # 4. 按月份统计支票数量
+        result = df_unique.groupby("月份")["付款支票号"].count().reset_index(name="支票数量")
+
+        st.info("部门每月的付款支票数量")
+        st.dataframe(result)
+
+
 
     # 图2：周度付款图（仅当用户选择周度时生成）
     if chart_type == '📅 部门周度付款趋势':
